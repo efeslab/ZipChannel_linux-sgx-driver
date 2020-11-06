@@ -328,6 +328,7 @@ static long sgx_ioc_ewb_eldu(struct file *filep, unsigned int cmd,
 	vma = find_vma(get_current()->mm, param->addr);
 	if(!vma) {
 		pr_err("isgx: vma not found!\n");
+		return 0;
 	}
 
 	res = sgx_throw_away_page(param->addr);
@@ -336,11 +337,52 @@ static long sgx_ioc_ewb_eldu(struct file *filep, unsigned int cmd,
 		return 0;
 	}
 
-	sgx_fault_page(vma, param->addr, 0, NULL); // XXX
-
 	up_read(&get_current()->mm->mmap_sem);
 
 //	pr_err("isgx: %s end\n", __func__);
+	return 0;
+}
+
+static long sgx_ioc_virt2pfn(struct file *filep, unsigned int cmd,
+				unsigned long arg)
+{
+	struct sgx_virt2pfn *param = (struct sgx_virt2pfn *)arg;
+	struct sgx_encl_page *entry;
+	struct sgx_encl *encl;
+	resource_size_t pa;
+	struct vm_area_struct *vma;
+
+
+	down_read(&get_current()->mm->mmap_sem);
+	vma = find_vma(get_current()->mm, param->addr);
+	if(!vma) {
+		pr_err("isgx: vma not found!\n");
+		return 0;
+	}
+
+	encl = vma->vm_private_data;
+	if(!encl) {
+		pr_err("isgx: encl not found\n");
+		goto out;
+	}
+	entry = radix_tree_lookup(&encl->page_tree, (param->addr) >> PAGE_SHIFT);
+	if(!entry) {
+		pr_err("isgx: entry not found\n");
+		goto out;
+	}
+	if(!(entry->epc_page)) {
+		pr_err("isgx: entry->epc_page not found\n");
+		param->pfn = ~0;
+		goto out;
+	}
+	pa = entry->epc_page->pa;
+	pr_err("isgx: pa = 0x%llx\n", pa);
+
+	param->pfn = pa/0x1000;
+
+out:
+	up_read(&get_current()->mm->mmap_sem);
+
 	return 0;
 }
 // Marina end
@@ -496,6 +538,7 @@ long sgx_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 	case SGX_IOC_ENCLAVE_PAGE_REMOVE:
 		handler = sgx_ioc_page_remove;
 		break;
+// Marina begin
 	case SGX_IOC_THROW_AWAY_PAGE:
 		handler = sgx_ioc_throw_away_page;
 		pr_err("isgx: Marina: sgx_ioc_throw_away_page\n");
@@ -504,6 +547,10 @@ long sgx_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 		handler = sgx_ioc_ewb_eldu;
 		//pr_err("isgx: Marina: ewb_eldu\n");
 		break;
+	case SGX_IOC_VIRT2PFN:
+		handler = sgx_ioc_virt2pfn;
+		break;
+// Marina end
 	default:
 		return -ENOIOCTLCMD;
 	}

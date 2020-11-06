@@ -85,6 +85,8 @@
 	_IOW(SGX_MAGIC, 0x03, struct sgx_ewb_eldu)
 #define SGX_IOC_THROW_AWAY_PAGE \
 	_IOW(SGX_MAGIC, 0x06, struct sgx_throw_away_page)
+#define SGX_IOC_VIRT2PFN \
+	_IOWR(SGX_MAGIC, 0x16, struct sgx_virt2pfn)
 // Marina end
 
 /* SGX leaf instruction return values */
@@ -175,6 +177,11 @@ struct sgx_throw_away_page {
 
 struct sgx_ewb_eldu {
 	unsigned long addr;
+};
+
+struct sgx_virt2pfn {
+	unsigned long addr; // input
+	unsigned long long pfn; // output
 };
 // Marina end
 
