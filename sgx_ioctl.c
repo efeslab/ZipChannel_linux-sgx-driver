@@ -260,6 +260,91 @@ out:
 	return ret;
 }
 
+// Marina begin
+void sgx_write_pages(struct sgx_encl *encl, struct list_head *src);
+
+int sgx_throw_away_page(unsigned long vaddr) // Marina
+{
+	struct sgx_encl *encl;
+	struct sgx_epc_page *entry;
+	LIST_HEAD(cluster);
+	int res = 0, i;
+
+	//pr_err("isgx: throwing away 0x%lx\n", vaddr);
+	if(vaddr == 0) {
+		pr_err("isgx: not throwing away NULL\n");
+		return 0;
+	}
+
+	res = sgx_get_encl(vaddr, &encl);
+	if(res) {
+		pr_err("isgx: sgx_get_encl failed\n");
+		kref_put(&encl->refcount, sgx_encl_release);
+		return res;
+	}
+
+	for (i = 0; i < 25600 ; i++) {	// to avoid infinite search
+		if (list_empty(&encl->load_list))
+			break;
+
+		entry = list_last_entry(&encl->load_list,
+					 struct sgx_epc_page,
+					 list);
+		//pr_err("isgx: entry pa = 0x%lx\n", entry->encl_page->addr);
+		if(entry->encl_page->addr == vaddr) {
+			list_move_tail(&entry->list, &cluster);
+//			pr_err("isgx: found!!!\n");
+			break;
+		} else {
+			list_move(&entry->list, &encl->load_list);
+		}
+	}
+	//pr_err("i = %d\n", i);
+
+	sgx_write_pages(encl, &cluster);
+
+	kref_put(&encl->refcount, sgx_encl_release);
+
+
+	return res;
+}
+
+static inline long sgx_ioc_throw_away_page(struct file *filep, unsigned int cmd,
+				 unsigned long arg)
+{
+	struct sgx_throw_away_page *param = (struct sgx_throw_away_page *)arg;
+	sgx_throw_away_page(param->addr);
+	return 0;
+}
+
+static long sgx_ioc_ewb_eldu(struct file *filep, unsigned int cmd,
+				 unsigned long arg)
+{
+	struct sgx_ewb_eldu *param = (struct sgx_ewb_eldu *)arg;
+	int res;
+	struct vm_area_struct *vma;
+
+	down_read(&get_current()->mm->mmap_sem);
+	vma = find_vma(get_current()->mm, param->addr);
+	if(!vma) {
+		pr_err("isgx: vma not found!\n");
+	}
+
+	res = sgx_throw_away_page(param->addr);
+	if(res) {
+		pr_err("isgx: sgx_throw_away_page failed\n");
+		return 0;
+	}
+
+	sgx_fault_page(vma, param->addr, 0, NULL); // XXX
+
+	up_read(&get_current()->mm->mmap_sem);
+
+//	pr_err("isgx: %s end\n", __func__);
+	return 0;
+}
+// Marina end
+
 long sgx_ioc_page_modpr(struct file *filep, unsigned int cmd,
 			unsigned long arg)
 {
@@ -410,6 +495,14 @@ long sgx_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 		break;
 	case SGX_IOC_ENCLAVE_PAGE_REMOVE:
 		handler = sgx_ioc_page_remove;
+		break;
+	case SGX_IOC_THROW_AWAY_PAGE:
+		handler = sgx_ioc_throw_away_page;
+		pr_err("isgx: Marina: sgx_ioc_throw_away_page\n");
+		break;
+	case SGX_IOC_EWB_ELDU:
+		handler = sgx_ioc_ewb_eldu;
+		//pr_err("isgx: Marina: ewb_eldu\n");
 		break;
 	default:
 		return -ENOIOCTLCMD;

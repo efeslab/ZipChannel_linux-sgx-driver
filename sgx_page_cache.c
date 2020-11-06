@@ -320,7 +320,8 @@ static void sgx_evict_page(struct sgx_encl_page *entry,
 	entry->flags &= ~SGX_ENCL_PAGE_RESERVED;
 }
 
-static void sgx_write_pages(struct sgx_encl *encl, struct list_head *src)
+//static void sgx_write_pages(struct sgx_encl *encl, struct list_head *src)
+void sgx_write_pages(struct sgx_encl *encl, struct list_head *src) // Marina removed static
 {
 	struct sgx_epc_page *entry;
 	struct sgx_epc_page *tmp;
@@ -564,7 +565,8 @@ void sgx_free_page(struct sgx_epc_page *entry, struct sgx_encl *encl)
 		sgx_crit(encl, "EREMOVE returned %d\n", ret);
 
 	spin_lock(&sgx_free_list_lock);
-	list_add(&entry->list, &sgx_free_list);
+	//list_add(&entry->list, &sgx_free_list); // Marina: original line
+	list_add_tail(&entry->list, &sgx_free_list); // Marina: I modified
 	sgx_nr_free_pages++;
 	spin_unlock(&sgx_free_list_lock);
 }

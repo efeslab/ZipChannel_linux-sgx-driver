@@ -80,6 +80,13 @@
 #define SGX_IOC_ENCLAVE_PAGE_REMOVE \
 	_IOW(SGX_MAGIC, 0x0d, unsigned long)
 
+// Marina begin
+#define SGX_IOC_EWB_ELDU \
+	_IOW(SGX_MAGIC, 0x03, struct sgx_ewb_eldu)
+#define SGX_IOC_THROW_AWAY_PAGE \
+	_IOW(SGX_MAGIC, 0x06, struct sgx_throw_away_page)
+// Marina end
+
 /* SGX leaf instruction return values */
 #define SGX_SUCCESS			0
 #define SGX_INVALID_SIG_STRUCT		1
@@ -160,5 +167,15 @@ struct sgx_modification_param {
 	struct sgx_range range;
 	unsigned long flags;
 };
+
+// Marina begin
+struct sgx_throw_away_page {
+	unsigned long addr;
+};
+
+struct sgx_ewb_eldu {
+	unsigned long addr;
+};
+// Marina end
 
 #endif /* _UAPI_ASM_X86_SGX_H */
