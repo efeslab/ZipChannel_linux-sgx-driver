@@ -337,6 +337,8 @@ static long sgx_ioc_ewb_eldu(struct file *filep, unsigned int cmd,
 		return 0;
 	}
 
+	sgx_fault_page(vma, param->addr, 0, NULL);
+
 	up_read(&get_current()->mm->mmap_sem);
 
 //	pr_err("isgx: %s end\n", __func__);
@@ -376,7 +378,7 @@ static long sgx_ioc_virt2pfn(struct file *filep, unsigned int cmd,
 		goto out;
 	}
 	pa = entry->epc_page->pa;
-	pr_err("isgx: pa = 0x%llx\n", pa);
+	//pr_err("isgx: pa = 0x%llx\n", pa);
 
 	param->pfn = pa/0x1000;
 
